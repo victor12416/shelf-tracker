@@ -114,9 +114,293 @@
     }
   </style>
 
-  <!-- Firebase v8 scripts (match the code below) -->
-  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+  <!-- Firebase modular SDK (v12) as ES modules -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
+    import {
+      getDatabase,
+      ref,
+      onValue,
+      set
+    } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-database.js";
+
+    // ---------- YOUR FIREBASE CONFIG ----------
+    const firebaseConfig = {
+      apiKey: "AIzaSyBSjLtFDNob4ccwa_AWP62luhbXNyQN-kc",
+      authDomain: "shelf-tracker-8c090.firebaseapp.com",
+      databaseURL: "https://shelf-tracker-8c090-default-rtdb.firebaseio.com",
+      projectId: "shelf-tracker-8c090",
+      storageBucket: "shelf-tracker-8c090.firebasestorage.app",
+      messagingSenderId: "497676127106",
+      appId: "1:497676127106:web:b2846fbe26c42c69335d9b",
+      measurementId: "G-NEDP05RC65"
+    };
+
+    // ---------- INITIALIZE FIREBASE ----------
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+    const rowsRef = ref(db, "rows");
+
+    // ---------- APP STATE ----------
+    const STORAGE_KEY = "shelf_replenish_backup_v1";
+    let rows = [];
+    let selectedIndex = null;
+
+    function setStatus(msg) {
+      document.getElementById("status").textContent = "Status: " + msg;
+    }
+
+    function saveLocal() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(rows));
+      } catch (e) {
+        console.warn("localStorage error:", e);
+      }
+    }
+
+    function loadLocal() {
+      try {
+        const t = localStorage.getItem(STORAGE_KEY);
+        if (t) rows = JSON.parse(t);
+      } catch (e) {
+        console.warn("localStorage error:", e);
+      }
+    }
+
+    // ---------- CLOUD SAVE & LISTEN ----------
+    function saveCloud() {
+      set(rowsRef, rows)
+        .then(() => setStatus("Saved to cloud (" + rows.length + " rows)."))
+        .catch((err) => {
+          console.error(err);
+          setStatus("Cloud save error: " + err.message);
+        });
+    }
+
+    function startCloudListener() {
+      onValue(
+        rowsRef,
+        (snap) => {
+          const val = snap.val();
+          if (Array.isArray(val)) {
+            rows = val.filter((r) => r);
+          } else if (val && typeof val === "object") {
+            rows = Object.values(val);
+          } else {
+            rows = [];
+          }
+          selectedIndex = null;
+          renderTable();
+          saveLocal();
+          setStatus("Loaded from cloud (" + rows.length + " rows).");
+        },
+        (err) => {
+          console.error("Cloud load error:", err);
+          setStatus("Cloud load error, using local backup.");
+          loadLocal();
+          renderTable();
+        }
+      );
+    }
+
+    // ---------- FORM HELPERS ----------
+    function clearForm() {
+      document.getElementById("in-shelf").value = "";
+      document.getElementById("in-sku").value = "";
+      document.getElementById("in-from").value = "";
+      document.getElementById("in-boxes").value = "";
+      document.getElementById("in-status").value = "NOT DONE";
+      document.getElementById("in-desc").value = "";
+    }
+
+    function readForm() {
+      let shelf = document.getElementById("in-shelf").value.trim().toUpperCase();
+      let sku = document.getElementById("in-sku").value.trim().toUpperCase();
+      let fromLoc = document.getElementById("in-from").value.trim().toUpperCase();
+      let boxesVal = document.getElementById("in-boxes").value.trim();
+      let status = document.getElementById("in-status").value.trim().toUpperCase();
+      let desc = document.getElementById("in-desc").value.trim();
+
+      let boxes = boxesVal === "" ? "" : Number(boxesVal);
+      if (boxesVal !== "" && Number.isNaN(boxes)) {
+        alert("Boxes must be a number.");
+        return null;
+      }
+      if (status !== "DONE" && status !== "NOT DONE") status = "NOT DONE";
+
+      return { shelf, sku, fromLoc, boxes, status, desc };
+    }
+
+    // ---------- TABLE RENDER ----------
+    function renderTable() {
+      const tbody = document.querySelector("#data-table tbody");
+      tbody.innerHTML = "";
+      rows.forEach((row, idx) => {
+        const tr = document.createElement("tr");
+        if (idx === selectedIndex) tr.classList.add("selected");
+
+        function cell(text) {
+          const td = document.createElement("td");
+          td.textContent = text;
+          return td;
+        }
+
+        tr.appendChild(cell(row.shelf));
+        tr.appendChild(cell(row.sku));
+        tr.appendChild(cell(row.fromLoc));
+        tr.appendChild(cell(row.boxes));
+
+        const tdDone = cell(row.status);
+        tdDone.classList.add(
+          "done-cell",
+          row.status === "DONE" ? "done" : "not-done"
+        );
+        tr.appendChild(tdDone);
+
+        tr.appendChild(cell(row.desc));
+
+        const tdActions = document.createElement("td");
+        tdActions.classList.add("row-buttons");
+
+        const btnEdit = document.createElement("button");
+        btnEdit.textContent = "Edit";
+        btnEdit.classList.add("edit-btn");
+        btnEdit.addEventListener("click", () => selectRow(idx));
+        tdActions.appendChild(btnEdit);
+
+        const btnDel = document.createElement("button");
+          btnDel.textContent = "Del";
+          btnDel.classList.add("delete-btn");
+          btnDel.addEventListener("click", () => deleteRow(idx));
+          tdActions.appendChild(btnDel);
+
+        tr.appendChild(tdActions);
+        tbody.appendChild(tr);
+      });
+    }
+
+    function selectRow(idx) {
+      selectedIndex = idx;
+      const row = rows[idx];
+      document.getElementById("in-shelf").value = row.shelf;
+      document.getElementById("in-sku").value = row.sku;
+      document.getElementById("in-from").value = row.fromLoc;
+      document.getElementById("in-boxes").value =
+        row.boxes === "" ? "" : String(row.boxes);
+      document.getElementById("in-status").value = row.status;
+      document.getElementById("in-desc").value = row.desc;
+      renderTable();
+      setStatus("Editing row " + (idx + 1) + " (Update to save).");
+    }
+
+    function deleteRow(idx) {
+      if (!confirm("Delete this row?")) return;
+      rows.splice(idx, 1);
+      selectedIndex = null;
+      saveLocal();
+      saveCloud();
+      renderTable();
+      setStatus("Row deleted.");
+    }
+
+    // ---------- CSV LOAD (only from file) ----------
+    function loadCSVFile(file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const text = e.target.result;
+        const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
+        const newRows = [];
+        for (let i = 1; i < lines.length; i++) {
+          const line = lines[i];
+          const parts = line.split(",");
+          const [shelf, sku, fromLoc, boxesRaw, statusRaw, ...rest] = parts;
+          const desc = rest.join(",") || "";
+          let boxes = boxesRaw ? Number(boxesRaw) : "";
+          if (Number.isNaN(boxes)) boxes = "";
+          const status = (statusRaw || "").trim().toUpperCase();
+          newRows.push({
+            shelf: (shelf || "").trim().toUpperCase(),
+            sku: (sku || "").trim().toUpperCase(),
+            fromLoc: (fromLoc || "").trim().toUpperCase(),
+            boxes,
+            status: status === "DONE" ? "DONE" : "NOT DONE",
+            desc: (desc || "").trim()
+          });
+        }
+        rows = newRows;
+        selectedIndex = null;
+        saveLocal();
+        saveCloud();
+        renderTable();
+        setStatus("CSV loaded (" + rows.length + " rows).");
+      };
+      reader.readAsText(file);
+    }
+
+    // ---------- BUTTON EVENTS ----------
+    function hookButtons() {
+      document.getElementById("btn-add").addEventListener("click", () => {
+        const data = readForm();
+        if (!data) return;
+        rows.push(data);
+        selectedIndex = rows.length - 1;
+        saveLocal();
+        saveCloud();
+        renderTable();
+        clearForm();
+        setStatus("Row added (" + rows.length + " total).");
+      });
+
+      document.getElementById("btn-update").addEventListener("click", () => {
+        if (selectedIndex === null) {
+          setStatus("Select a row first (tap Edit).");
+          return;
+        }
+        const data = readForm();
+        if (!data) return;
+        rows[selectedIndex] = data;
+        saveLocal();
+        saveCloud();
+        renderTable();
+        clearForm();
+        selectedIndex = null;
+        setStatus("Row updated.");
+      });
+
+      document.getElementById("btn-clear-form").addEventListener("click", () => {
+        clearForm();
+        selectedIndex = null;
+        renderTable();
+        setStatus("Inputs cleared.");
+      });
+
+      document.getElementById("btn-clear-all").addEventListener("click", () => {
+        if (!confirm("Clear the entire database for everyone?")) return;
+        rows = [];
+        selectedIndex = null;
+        saveLocal();
+        saveCloud();
+        renderTable();
+        setStatus("Database cleared.");
+      });
+
+      document.getElementById("file-input").addEventListener("change", (e) => {
+        const file = e.target.files[0];
+        if (file) {
+          loadCSVFile(file);
+          e.target.value = "";
+        }
+      });
+    }
+
+    // ---------- INIT ----------
+    window.addEventListener("DOMContentLoaded", () => {
+      hookButtons();
+      loadLocal();
+      renderTable();
+      startCloudListener();
+    });
+  </script>
 </head>
 <body>
   <h1>Shelf Replenish Tracker</h1>
@@ -136,10 +420,8 @@
   <div class="buttons-row">
     <button id="btn-add">Add row</button>
     <button id="btn-update">Update selected</button>
-    <button id="btn-clear-form">Clear form</button>
-    <button id="btn-clear-all">Clear ALL rows</button>
-    <button id="btn-download">Download CSV</button>
-    <button id="btn-save-local">Save to device</button>
+    <button id="btn-clear-form">Clear inputs</button>
+    <button id="btn-clear-all">Clear database</button>
   </div>
 
   <div id="status">Status: Ready</div>
@@ -165,344 +447,5 @@
     <label for="file-input">Load CSV:</label>
     <input type="file" id="file-input" accept=".csv,text/csv" />
   </div>
-
-  <script>
-    // ---------- Firebase init (your config) ----------
-    const firebaseConfig = {
-      apiKey: "AIzaSyBSjLtFDNob4ccwa_AWP62luhbXNyQN-kc",
-      authDomain: "shelf-tracker-8c090.firebaseapp.com",
-      databaseURL: "https://shelf-tracker-8c090-default-rtdb.firebaseio.com",
-      projectId: "shelf-tracker-8c090",
-      storageBucket: "shelf-tracker-8c090.firebasestorage.app",
-      messagingSenderId: "497676127106",
-      appId: "1:497676127106:web:b2846fbe26c42c69335d9b",
-      measurementId: "G-NEDP05RC65"
-    };
-
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.database();
-    const rowsRef = db.ref("rows"); // all rows stored under /rows
-
-    // ---------- App state ----------
-    const STORAGE_KEY = "shelf_replenish_data_v1_backup";
-
-    // rows: [{shelf, sku, fromLoc, boxes, status, desc}, ...]
-    let rows = [];
-    let selectedIndex = null;
-
-    function setStatus(msg) {
-      document.getElementById("status").textContent = "Status: " + msg;
-    }
-
-    // ---------- local backup (optional) ----------
-    function saveToLocal() {
-      try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(rows));
-      } catch (e) {
-        console.warn("localStorage error:", e);
-      }
-    }
-
-    function loadFromLocal() {
-      try {
-        const text = localStorage.getItem(STORAGE_KEY);
-        if (text) {
-          rows = JSON.parse(text);
-        }
-      } catch (e) {
-        console.warn("localStorage error:", e);
-      }
-    }
-
-    // ---------- Firebase sync ----------
-    function saveToCloud() {
-      rowsRef
-        .set(rows)
-        .then(() => {
-          setStatus("Saved to cloud (" + rows.length + " rows).");
-        })
-        .catch((err) => {
-          console.error(err);
-          setStatus("Cloud save error: " + err.message);
-        });
-    }
-
-    function startCloudListener() {
-      rowsRef.on(
-        "value",
-        (snapshot) => {
-          const val = snapshot.val();
-          if (Array.isArray(val)) {
-            rows = val.filter((r) => r); // remove nulls
-          } else if (val && typeof val === "object") {
-            rows = Object.values(val);
-          } else {
-            rows = [];
-          }
-          selectedIndex = null;
-          renderTable();
-          saveToLocal(); // backup
-          setStatus("Loaded from cloud (" + rows.length + " rows).");
-        },
-        (err) => {
-          console.error("Cloud load error:", err);
-          setStatus("Cloud load error, using local backup.");
-          loadFromLocal();
-          renderTable();
-        }
-      );
-    }
-
-    // ---------- Form helpers ----------
-    function clearForm() {
-      document.getElementById("in-shelf").value = "";
-      document.getElementById("in-sku").value = "";
-      document.getElementById("in-from").value = "";
-      document.getElementById("in-boxes").value = "";
-      document.getElementById("in-status").value = "NOT DONE";
-      document.getElementById("in-desc").value = "";
-    }
-
-    function readForm() {
-      let shelf = document.getElementById("in-shelf").value.trim().toUpperCase();
-      let sku = document.getElementById("in-sku").value.trim().toUpperCase();
-      let fromLoc = document.getElementById("in-from").value.trim().toUpperCase();
-      let boxesVal = document.getElementById("in-boxes").value.trim();
-      let status = document.getElementById("in-status").value.trim().toUpperCase();
-      let desc = document.getElementById("in-desc").value.trim();
-
-      let boxes = boxesVal === "" ? "" : Number(boxesVal);
-      if (boxesVal !== "" && Number.isNaN(boxes)) {
-        alert("Boxes must be a number.");
-        return null;
-      }
-      if (status !== "DONE" && status !== "NOT DONE") {
-        status = "NOT DONE";
-      }
-
-      return { shelf, sku, fromLoc, boxes, status, desc };
-    }
-
-    // ---------- Table rendering ----------
-    function renderTable() {
-      const tbody = document.querySelector("#data-table tbody");
-      tbody.innerHTML = "";
-
-      rows.forEach((row, idx) => {
-        const tr = document.createElement("tr");
-        if (idx === selectedIndex) tr.classList.add("selected");
-
-        const tdShelf = document.createElement("td");
-        tdShelf.textContent = row.shelf;
-        tr.appendChild(tdShelf);
-
-        const tdSku = document.createElement("td");
-        tdSku.textContent = row.sku;
-        tr.appendChild(tdSku);
-
-        const tdFrom = document.createElement("td");
-        tdFrom.textContent = row.fromLoc;
-        tr.appendChild(tdFrom);
-
-        const tdBoxes = document.createElement("td");
-        tdBoxes.textContent = row.boxes;
-        tr.appendChild(tdBoxes);
-
-        const tdDone = document.createElement("td");
-        tdDone.textContent = row.status;
-        tdDone.classList.add(
-          "done-cell",
-          row.status === "DONE" ? "done" : "not-done"
-        );
-        tr.appendChild(tdDone);
-
-        const tdDesc = document.createElement("td");
-        tdDesc.textContent = row.desc;
-        tr.appendChild(tdDesc);
-
-        const tdActions = document.createElement("td");
-        tdActions.classList.add("row-buttons");
-
-        const btnEdit = document.createElement("button");
-        btnEdit.textContent = "Edit";
-        btnEdit.classList.add("edit-btn");
-        btnEdit.addEventListener("click", () => selectRow(idx));
-        tdActions.appendChild(btnEdit);
-
-        const btnDel = document.createElement("button");
-        btnDel.textContent = "Del";
-        btnDel.classList.add("delete-btn");
-        btnDel.addEventListener("click", () => deleteRow(idx));
-        tdActions.appendChild(btnDel);
-
-        tr.appendChild(tdActions);
-        tbody.appendChild(tr);
-      });
-    }
-
-    function selectRow(idx) {
-      selectedIndex = idx;
-      const row = rows[idx];
-      document.getElementById("in-shelf").value = row.shelf;
-      document.getElementById("in-sku").value = row.sku;
-      document.getElementById("in-from").value = row.fromLoc;
-      document.getElementById("in-boxes").value =
-        row.boxes === "" ? "" : String(row.boxes);
-      document.getElementById("in-status").value = row.status;
-      document.getElementById("in-desc").value = row.desc;
-      renderTable();
-      setStatus("Editing row " + (idx + 1) + " (Update to save).");
-    }
-
-    function deleteRow(idx) {
-      if (!confirm("Delete this row?")) return;
-      rows.splice(idx, 1);
-      selectedIndex = null;
-      saveToLocal();
-      saveToCloud();
-      renderTable();
-      setStatus("Row deleted.");
-    }
-
-    // ---------- CSV helpers ----------
-    function toCSV() {
-      const header = ["Shelf", "SKU", "From", "Boxes", "Done?", "Description"];
-      const lines = [header.join(",")];
-      rows.forEach((r) => {
-        const vals = [
-          r.shelf,
-          r.sku,
-          r.fromLoc,
-          r.boxes,
-          r.status,
-          r.desc,
-        ].map((v) => {
-          v = String(v ?? "");
-          if (v.includes(",") || v.includes('"')) {
-            v = '"' + v.replace(/"/g, '""') + '"';
-          }
-          return v;
-        });
-        lines.push(vals.join(","));
-      });
-      return lines.join("\n");
-    }
-
-    function downloadCSV() {
-      const csv = toCSV();
-      const blob = new Blob([csv], { type: "text/csv" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "shelf_replenish.csv";
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
-      setStatus("CSV downloaded.");
-    }
-
-    function loadCSVFile(file) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const text = e.target.result;
-        const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
-        const newRows = [];
-        for (let i = 1; i < lines.length; i++) {
-          const line = lines[i];
-          const parts = line.split(",");
-          const [shelf, sku, fromLoc, boxesRaw, statusRaw, ...rest] = parts;
-          const desc = rest.join(",") || "";
-          let boxes = boxesRaw ? Number(boxesRaw) : "";
-          if (Number.isNaN(boxes)) boxes = "";
-          const status = (statusRaw || "").trim().toUpperCase();
-          newRows.push({
-            shelf: (shelf || "").trim().toUpperCase(),
-            sku: (sku || "").trim().toUpperCase(),
-            fromLoc: (fromLoc || "").trim().toUpperCase(),
-            boxes,
-            status: status === "DONE" ? "DONE" : "NOT DONE",
-            desc: (desc || "").trim(),
-          });
-        }
-        rows = newRows;
-        selectedIndex = null;
-        saveToLocal();
-        saveToCloud();
-        renderTable();
-        setStatus("CSV loaded (" + rows.length + " rows).");
-      };
-      reader.readAsText(file);
-    }
-
-    // ---------- Button events ----------
-    document.getElementById("btn-add").addEventListener("click", () => {
-      const data = readForm();
-      if (!data) return;
-      rows.push(data);
-      selectedIndex = rows.length - 1;
-      saveToLocal();
-      saveToCloud();
-      renderTable();
-      clearForm();
-      setStatus("Row added (" + rows.length + " total).");
-    });
-
-    document.getElementById("btn-update").addEventListener("click", () => {
-      if (selectedIndex === null) {
-        setStatus("Select a row first (tap Edit).");
-        return;
-      }
-      const data = readForm();
-      if (!data) return;
-      rows[selectedIndex] = data;
-      saveToLocal();
-      saveToCloud();
-      renderTable();
-      clearForm();
-      selectedIndex = null;
-      setStatus("Row updated.");
-    });
-
-    document.getElementById("btn-clear-form").addEventListener("click", () => {
-      clearForm();
-      selectedIndex = null;
-      renderTable();
-      setStatus("Form cleared.");
-    });
-
-    document.getElementById("btn-clear-all").addEventListener("click", () => {
-      if (!confirm("Clear ALL rows?")) return;
-      rows = [];
-      selectedIndex = null;
-      saveToLocal();
-      saveToCloud();
-      renderTable();
-      setStatus("All rows cleared.");
-    });
-
-    document.getElementById("btn-download").addEventListener("click", () => {
-      downloadCSV();
-    });
-
-    document.getElementById("btn-save-local").addEventListener("click", () => {
-      saveToLocal();
-      setStatus("Saved local backup.");
-    });
-
-    document.getElementById("file-input").addEventListener("change", (e) => {
-      const file = e.target.files[0];
-      if (file) {
-        loadCSVFile(file);
-        e.target.value = "";
-      }
-    });
-
-    // ---------- Init ----------
-    loadFromLocal();
-    renderTable();
-    startCloudListener();
-  </script>
 </body>
 </html>
-
