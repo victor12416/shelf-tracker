@@ -18,6 +18,28 @@
       margin: 10px 0;
       font-size: 28px;
     }
+    .user-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin: 4px 0 8px 0;
+    }
+    .user-bar input {
+      flex: 1 1 50%;
+      padding: 8px;
+      font-size: 18px;
+      border-radius: 4px;
+      border: 1px solid #555;
+    }
+    .user-bar button {
+      flex: 1 1 20%;
+      padding: 8px;
+      font-size: 16px;
+      border-radius: 4px;
+      border: none;
+      background: #444;
+      color: #fff;
+    }
     .top-bar {
       display: flex;
       flex-wrap: wrap;
@@ -66,7 +88,7 @@
     table {
       width: 100%;
       border-collapse: collapse;
-      min-width: 800px;
+      min-width: 900px;
     }
     th,
     td {
@@ -144,9 +166,13 @@
 
     // ---------- APP STATE ----------
     const STORAGE_KEY = "shelf_replenish_backup_v1";
+    const USER_KEY = "shelf_replenish_user_v1";
+
     let rows = [];
     let selectedIndex = null;
-    let showNewestFirst = true; // true = newest first (top), false = oldest first
+    let showNewestFirst = true;   // true = newest at top
+    let filterMineOnly = true;    // true = only my rows, false = all
+    let currentUser = "";
 
     function setStatus(msg) {
       document.getElementById("status").textContent = "Status: " + msg;
@@ -166,6 +192,27 @@
         if (t) rows = JSON.parse(t);
       } catch (e) {
         console.warn("localStorage error:", e);
+      }
+    }
+
+    function saveUserLocal() {
+      try {
+        localStorage.setItem(USER_KEY, currentUser);
+      } catch (e) {
+        console.warn("localStorage user error:", e);
+      }
+    }
+
+    function loadUserLocal() {
+      try {
+        const u = localStorage.getItem(USER_KEY);
+        if (u) {
+          currentUser = u;
+          const inUser = document.getElementById("in-user");
+          if (inUser) inUser.value = u;
+        }
+      } catch (e) {
+        console.warn("localStorage user error:", e);
       }
     }
 
@@ -233,17 +280,29 @@
       return { shelf, sku, fromLoc, boxes, status, desc };
     }
 
+    // ---------- DISPLAY INDEX HELPER ----------
+    function getDisplayIndices() {
+      const idxs = [];
+      for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        if (filterMineOnly && currentUser) {
+          if (!row.user || row.user !== currentUser) continue;
+        }
+        idxs.push(i);
+      }
+      if (showNewestFirst) {
+        idxs.reverse();
+      }
+      return idxs;
+    }
+
     // ---------- TABLE RENDER ----------
     function renderTable() {
       const tbody = document.querySelector("#data-table tbody");
       tbody.innerHTML = "";
 
-      const total = rows.length;
-      for (let displayIdx = 0; displayIdx < total; displayIdx++) {
-        const realIdx = showNewestFirst
-          ? total - 1 - displayIdx   // newest first (last pushed on top)
-          : displayIdx;              // oldest first
-
+      const indices = getDisplayIndices();
+      for (const realIdx of indices) {
         const row = rows[realIdx];
         const tr = document.createElement("tr");
         if (realIdx === selectedIndex) tr.classList.add("selected");
@@ -254,6 +313,7 @@
           return td;
         }
 
+        tr.appendChild(cell(row.user || ""));  // USER column
         tr.appendChild(cell(row.shelf));
         tr.appendChild(cell(row.sku));
         tr.appendChild(cell(row.fromLoc));
@@ -334,7 +394,8 @@
             fromLoc: (fromLoc || "").trim().toUpperCase(),
             boxes,
             status: status === "DONE" ? "DONE" : "NOT DONE",
-            desc: (desc || "").trim()
+            desc: (desc || "").trim(),
+            user: currentUser || ""
           });
         }
         rows = newRows;
@@ -349,10 +410,37 @@
 
     // ---------- BUTTON EVENTS ----------
     function hookButtons() {
+      // Set user
+      document.getElementById("btn-set-user").addEventListener("click", () => {
+        const val = document.getElementById("in-user").value.trim();
+        if (!val) {
+          alert("Enter your name or initials.");
+          return;
+        }
+        currentUser = val;
+        saveUserLocal();
+        updateFilterButtonText();
+        setStatus("User set to: " + currentUser);
+        renderTable();
+      });
+
+      // Filter Mine / All
+      document.getElementById("btn-filter").addEventListener("click", () => {
+        filterMineOnly = !filterMineOnly;
+        updateFilterButtonText();
+        renderTable();
+        setStatus(filterMineOnly ? "Showing only your rows." : "Showing all rows.");
+      });
+
       document.getElementById("btn-add").addEventListener("click", () => {
+        if (!currentUser) {
+          alert("Set your name/initials first.");
+          return;
+        }
         const data = readForm();
         if (!data) return;
-        rows.push(data);
+        const row = { ...data, user: currentUser };
+        rows.push(row);
         selectedIndex = rows.length - 1;
         saveLocal();
         saveCloud();
@@ -368,7 +456,8 @@
         }
         const data = readForm();
         if (!data) return;
-        rows[selectedIndex] = data;
+        const oldUser = rows[selectedIndex].user || currentUser || "";
+        rows[selectedIndex] = { ...data, user: oldUser };
         saveLocal();
         saveCloud();
         renderTable();
@@ -402,24 +491,37 @@
         }
       });
 
-      // NEW: toggle display order
+      // Order toggle
       document.getElementById("btn-order").addEventListener("click", () => {
         showNewestFirst = !showNewestFirst;
-        const btn = document.getElementById("btn-order");
-        if (showNewestFirst) {
-          btn.textContent = "Order ⬆"; // newest on top
-          setStatus("Showing newest rows first.");
-        } else {
-          btn.textContent = "Order ⬇"; // oldest on top
-          setStatus("Showing oldest rows first.");
-        }
+        updateOrderButtonText();
         renderTable();
+        setStatus(
+          showNewestFirst
+            ? "Showing newest rows first."
+            : "Showing oldest rows first."
+        );
       });
+    }
+
+    function updateFilterButtonText() {
+      const btn = document.getElementById("btn-filter");
+      if (!btn) return;
+      btn.textContent = filterMineOnly ? "Filter: Mine" : "Filter: All";
+    }
+
+    function updateOrderButtonText() {
+      const btn = document.getElementById("btn-order");
+      if (!btn) return;
+      btn.textContent = showNewestFirst ? "Order ⬆" : "Order ⬇";
     }
 
     // ---------- INIT ----------
     window.addEventListener("DOMContentLoaded", () => {
+      loadUserLocal();
       hookButtons();
+      updateFilterButtonText();
+      updateOrderButtonText();
       loadLocal();
       renderTable();
       startCloudListener();
@@ -428,6 +530,12 @@
 </head>
 <body>
   <h1>Shelf Replenish Tracker</h1>
+
+  <div class="user-bar">
+    <input id="in-user" placeholder="Your name / initials" />
+    <button id="btn-set-user">Set user</button>
+    <button id="btn-filter">Filter: Mine</button>
+  </div>
 
   <div class="top-bar">
     <input id="in-shelf" placeholder="Shelf (e.g. AA03)" />
@@ -455,6 +563,7 @@
     <table id="data-table">
       <thead>
         <tr>
+          <th>User</th>
           <th>Shelf</th>
           <th>SKU</th>
           <th>From</th>
