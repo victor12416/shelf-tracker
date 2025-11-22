@@ -146,6 +146,7 @@
     const STORAGE_KEY = "shelf_replenish_backup_v1";
     let rows = [];
     let selectedIndex = null;
+    let showNewestFirst = true; // true = newest first (top), false = oldest first
 
     function setStatus(msg) {
       document.getElementById("status").textContent = "Status: " + msg;
@@ -236,9 +237,16 @@
     function renderTable() {
       const tbody = document.querySelector("#data-table tbody");
       tbody.innerHTML = "";
-      rows.forEach((row, idx) => {
+
+      const total = rows.length;
+      for (let displayIdx = 0; displayIdx < total; displayIdx++) {
+        const realIdx = showNewestFirst
+          ? total - 1 - displayIdx   // newest first (last pushed on top)
+          : displayIdx;              // oldest first
+
+        const row = rows[realIdx];
         const tr = document.createElement("tr");
-        if (idx === selectedIndex) tr.classList.add("selected");
+        if (realIdx === selectedIndex) tr.classList.add("selected");
 
         function cell(text) {
           const td = document.createElement("td");
@@ -266,20 +274,19 @@
         const btnDel = document.createElement("button");
         btnDel.textContent = "Del";
         btnDel.classList.add("delete-btn");
-        // stop click from also selecting the row
         btnDel.addEventListener("click", (e) => {
-          e.stopPropagation();
-          deleteRow(idx);
+          e.stopPropagation(); // don't also select the row
+          deleteRow(realIdx);
         });
         tdActions.appendChild(btnDel);
 
         tr.appendChild(tdActions);
 
-        // NEW: tap anywhere on the row to select/edit
-        tr.addEventListener("click", () => selectRow(idx));
+        // tap row to select/edit
+        tr.addEventListener("click", () => selectRow(realIdx));
 
         tbody.appendChild(tr);
-      });
+      }
     }
 
     function selectRow(idx) {
@@ -394,6 +401,20 @@
           e.target.value = "";
         }
       });
+
+      // NEW: toggle display order
+      document.getElementById("btn-order").addEventListener("click", () => {
+        showNewestFirst = !showNewestFirst;
+        const btn = document.getElementById("btn-order");
+        if (showNewestFirst) {
+          btn.textContent = "Order ⬆"; // newest on top
+          setStatus("Showing newest rows first.");
+        } else {
+          btn.textContent = "Order ⬇"; // oldest on top
+          setStatus("Showing oldest rows first.");
+        }
+        renderTable();
+      });
     }
 
     // ---------- INIT ----------
@@ -425,6 +446,7 @@
     <button id="btn-update">Update selected</button>
     <button id="btn-clear-form">Clear inputs</button>
     <button id="btn-clear-all">Clear database</button>
+    <button id="btn-order">Order ⬆</button>
   </div>
 
   <div id="status">Status: Ready</div>
@@ -452,4 +474,3 @@
   </div>
 </body>
 </html>
-
