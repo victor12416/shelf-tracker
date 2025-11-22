@@ -96,15 +96,12 @@
       border: none;
       color: #fff;
     }
-    .row-buttons .edit-btn {
-      background: #2d7;
-    }
     .row-buttons .delete-btn {
       background: #d33;
     }
     input:focus, select:focus {
-    outline: 3px solid #ffff00 !important;
-    outline-offset: 2px;
+      outline: 3px solid #ffff00 !important;
+      outline-offset: 2px;
     }
     .file-row {
       display: flex;
@@ -266,19 +263,21 @@
         const tdActions = document.createElement("td");
         tdActions.classList.add("row-buttons");
 
-        const btnEdit = document.createElement("button");
-        btnEdit.textContent = "Edit";
-        btnEdit.classList.add("edit-btn");
-        btnEdit.addEventListener("click", () => selectRow(idx));
-        tdActions.appendChild(btnEdit);
-
         const btnDel = document.createElement("button");
-          btnDel.textContent = "Del";
-          btnDel.classList.add("delete-btn");
-          btnDel.addEventListener("click", () => deleteRow(idx));
-          tdActions.appendChild(btnDel);
+        btnDel.textContent = "Del";
+        btnDel.classList.add("delete-btn");
+        // stop click from also selecting the row
+        btnDel.addEventListener("click", (e) => {
+          e.stopPropagation();
+          deleteRow(idx);
+        });
+        tdActions.appendChild(btnDel);
 
         tr.appendChild(tdActions);
+
+        // NEW: tap anywhere on the row to select/edit
+        tr.addEventListener("click", () => selectRow(idx));
+
         tbody.appendChild(tr);
       });
     }
@@ -357,7 +356,7 @@
 
       document.getElementById("btn-update").addEventListener("click", () => {
         if (selectedIndex === null) {
-          setStatus("Select a row first (tap Edit).");
+          setStatus("Select a row first (tap it).");
           return;
         }
         const data = readForm();
@@ -453,3 +452,4 @@
   </div>
 </body>
 </html>
+
