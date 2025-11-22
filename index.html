@@ -173,9 +173,30 @@
     let showNewestFirst = true;   // true = newest at top
     let filterMineOnly = true;    // true = only my rows, false = all
     let currentUser = "";
+    let lastStatusNote = "Ready";
+
+    function updateStatusBar() {
+      const el = document.getElementById("status");
+      if (!el) return;
+
+      const indices = getDisplayIndices();
+      let total = indices.length;
+      let done = 0;
+      let notDone = 0;
+
+      for (const idx of indices) {
+        const row = rows[idx];
+        if (row.status === "DONE") done++;
+        else notDone++;
+      }
+
+      el.textContent =
+        `Status: ${total} rows | ✔ ${done} | ❌ ${notDone} — ${lastStatusNote}`;
+    }
 
     function setStatus(msg) {
-      document.getElementById("status").textContent = "Status: " + msg;
+      lastStatusNote = msg;
+      updateStatusBar();
     }
 
     function saveLocal() {
@@ -245,9 +266,9 @@
         },
         (err) => {
           console.error("Cloud load error:", err);
-          setStatus("Cloud load error, using local backup.");
           loadLocal();
           renderTable();
+          setStatus("Cloud load error, using local backup.");
         }
       );
     }
@@ -290,9 +311,7 @@
         }
         idxs.push(i);
       }
-      if (showNewestFirst) {
-        idxs.reverse();
-      }
+      if (showNewestFirst) idxs.reverse();
       return idxs;
     }
 
@@ -347,6 +366,9 @@
 
         tbody.appendChild(tr);
       }
+
+      // update counts/message
+      updateStatusBar();
     }
 
     function selectRow(idx) {
@@ -420,8 +442,8 @@
         currentUser = val;
         saveUserLocal();
         updateFilterButtonText();
-        setStatus("User set to: " + currentUser);
         renderTable();
+        setStatus("User set to: " + currentUser);
       });
 
       // Filter Mine / All
@@ -525,6 +547,7 @@
       loadLocal();
       renderTable();
       startCloudListener();
+      updateStatusBar();
     });
   </script>
 </head>
