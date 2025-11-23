@@ -249,6 +249,7 @@
     // ---------- APP STATE ----------
     const STORAGE_KEY = "shelf_replenish_backup_v1";
     const USER_KEY = "shelf_replenish_user_v1";
+  const ZOOM_KEY = "shelf_replenish_zoom_v1";
 
     let rows = [];
     let selectedIndex = null;
@@ -256,6 +257,7 @@
     let filterMineOnly = true;    // true = only my rows, false = all
     let currentUser = "";
     let lastStatusNote = "Ready";
+  let currentZoom = 1.0;
 
     // --- Admin state ---
     const ADMIN_PIN = "4095";  // <<< CHANGE THIS TO YOUR SECRET PIN
@@ -405,6 +407,36 @@
         }
       } catch (e) {
         console.warn("localStorage user error:", e);
+      }
+    }
+
+    // ---------- ZOOM (per-device) ----------
+    function applyZoom() {
+      try {
+        document.body.style.zoom = String(currentZoom);
+      } catch (e) {
+        console.warn("applyZoom error:", e);
+      }
+    }
+
+    function saveZoomLocal() {
+      try {
+        localStorage.setItem(ZOOM_KEY, String(currentZoom));
+      } catch (e) {
+        console.warn("localStorage zoom save error:", e);
+      }
+    }
+
+    function loadZoomLocal() {
+      try {
+        const v = localStorage.getItem(ZOOM_KEY);
+        if (!v) return;
+        const f = parseFloat(v);
+        if (!Number.isNaN(f) && f >= 0.8 && f <= 1.4) {
+          currentZoom = f;
+        }
+      } catch (e) {
+        console.warn("localStorage zoom load error:", e);
       }
     }
 
@@ -772,6 +804,27 @@
             : "Showing oldest rows first."
         );
       });
+
+      // Zoom controls (per-device)
+      const btnZoomIn = document.getElementById("btn-zoom-in");
+      if (btnZoomIn) {
+        btnZoomIn.addEventListener("click", () => {
+          currentZoom = Math.min(1.4, Math.round((currentZoom + 0.1) * 10) / 10);
+          applyZoom();
+          saveZoomLocal();
+          setStatus("Zoom: " + Math.round(currentZoom * 100) + "%");
+        });
+      }
+
+      const btnZoomOut = document.getElementById("btn-zoom-out");
+      if (btnZoomOut) {
+        btnZoomOut.addEventListener("click", () => {
+          currentZoom = Math.max(0.8, Math.round((currentZoom - 0.1) * 10) / 10);
+          applyZoom();
+          saveZoomLocal();
+          setStatus("Zoom: " + Math.round(currentZoom * 100) + "%");
+        });
+      }
     }
 
     function updateFilterButtonText() {
@@ -789,6 +842,8 @@
     // ---------- INIT ----------
     window.addEventListener("DOMContentLoaded", () => {
       loadUserLocal();
+      loadZoomLocal();
+      applyZoom();
       hookButtons();
       updateFilterButtonText();
       updateOrderButtonText();
@@ -835,6 +890,8 @@
     <button id="btn-clear-form">Clear inputs</button>
     <button id="btn-end-day">End Day (Archive + Clear)</button>
     <button id="btn-order">Order ⬆</button>
+    <button id="btn-zoom-in">Zoom +</button>
+    <button id="btn-zoom-out">Zoom −</button>
   </div>
 
   <div id="status">Status: Ready</div>
