@@ -25,14 +25,14 @@
       margin: 4px 0 8px 0;
     }
     .user-bar input {
-      flex: 1 1 50%;
+      flex: 1 1 40%;
       padding: 8px;
       font-size: 18px;
       border-radius: 4px;
       border: 1px solid #555;
     }
     .user-bar button {
-      flex: 1 1 20%;
+      flex: 1 1 18%;
       padding: 8px;
       font-size: 16px;
       border-radius: 4px;
@@ -76,6 +76,17 @@
       font-size: 16px;
       margin-bottom: 4px;
       text-align: center;
+    }
+    .metrics-panel {
+      font-size: 14px;
+      margin-bottom: 6px;
+      background: #111;
+      border-radius: 4px;
+      padding: 6px 8px;
+      line-height: 1.4;
+    }
+    .metrics-row {
+      margin: 2px 0;
     }
     .table-wrapper {
       overflow-x: auto;
@@ -175,6 +186,36 @@
     let currentUser = "";
     let lastStatusNote = "Ready";
 
+    // --- Admin state ---
+    const ADMIN_PIN = "4729";  // <<< CHANGE THIS TO YOUR SECRET PIN
+    let isAdmin = false;
+
+    // ---------- DATE HELPERS ----------
+    function todayStr() {
+      return new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+    }
+
+    // ---------- ADMIN UI ----------
+    function updateAdminUI() {
+      const endBtn = document.getElementById("btn-end-day");
+      if (!endBtn) return;
+      endBtn.style.display = isAdmin ? "inline-block" : "none";
+    }
+
+    // ---------- STATUS / METRICS ----------
+    function getDisplayIndices() {
+      const idxs = [];
+      for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        if (filterMineOnly && currentUser) {
+          if (!row.user || row.user !== currentUser) continue;
+        }
+        idxs.push(i);
+      }
+      if (showNewestFirst) idxs.reverse();
+      return idxs;
+    }
+
     function updateStatusBar() {
       const el = document.getElementById("status");
       if (!el) return;
@@ -197,8 +238,67 @@
     function setStatus(msg) {
       lastStatusNote = msg;
       updateStatusBar();
+      updateMetricsPanel();
     }
 
+    function computeDailyMetrics(forUser) {
+      const t = todayStr();
+      let total = 0;
+      let done = 0;
+      let notDone = 0;
+      let boxesTotal = 0;
+      let boxesDone = 0;
+
+      for (const row of rows) {
+        const d = row.dateStr || t;
+        if (d !== t) continue;
+        if (forUser && row.user !== forUser) continue;
+
+        total++;
+        const boxesNum =
+          row.boxes === "" || row.boxes == null ? 0 : Number(row.boxes) || 0;
+        boxesTotal += boxesNum;
+
+        if (row.status === "DONE") {
+          done++;
+          boxesDone += boxesNum;
+        } else {
+          notDone++;
+        }
+      }
+      return { total, done, notDone, boxesTotal, boxesDone };
+    }
+
+    function updateMetricsPanel() {
+      const panel = document.getElementById("metrics-panel");
+      if (!panel) return;
+
+      const meMetrics =
+        currentUser ? computeDailyMetrics(currentUser) : null;
+      const allMetrics = computeDailyMetrics(null);
+
+      let meLine;
+      if (!currentUser) {
+        meLine = "Today (You): set your initials to see your metrics.";
+      } else {
+        meLine =
+          `Today (You - ${currentUser}): ` +
+          `${meMetrics.total} rows | ✔ ${meMetrics.done} | ❌ ${meMetrics.notDone}` +
+          ` | Boxes: ${meMetrics.boxesTotal} (✔ ${meMetrics.boxesDone})`;
+      }
+
+      const allLine =
+        `Today (All): ${allMetrics.total} rows | ✔ ${allMetrics.done}` +
+        ` | ❌ ${allMetrics.notDone} | Boxes: ${allMetrics.boxesTotal}` +
+        ` (✔ ${allMetrics.boxesDone})`;
+
+      panel.innerHTML = `
+        <div class="metrics-row">${meLine}</div>
+        <div class="metrics-row">${allLine}</div>
+      `;
+    }
+
+    // ---------- LOCAL STORAGE ----------
     function saveLocal() {
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(rows));
@@ -301,20 +401,6 @@
       return { shelf, sku, fromLoc, boxes, status, desc };
     }
 
-    // ---------- DISPLAY INDEX HELPER ----------
-    function getDisplayIndices() {
-      const idxs = [];
-      for (let i = 0; i < rows.length; i++) {
-        const row = rows[i];
-        if (filterMineOnly && currentUser) {
-          if (!row.user || row.user !== currentUser) continue;
-        }
-        idxs.push(i);
-      }
-      if (showNewestFirst) idxs.reverse();
-      return idxs;
-    }
-
     // ---------- TABLE RENDER ----------
     function renderTable() {
       const tbody = document.querySelector("#data-table tbody");
@@ -367,8 +453,8 @@
         tbody.appendChild(tr);
       }
 
-      // update counts/message
       updateStatusBar();
+      updateMetricsPanel();
     }
 
     function selectRow(idx) {
@@ -395,6 +481,86 @@
       setStatus("Row deleted.");
     }
 
+    // ---------- END DAY (ARCHIVE + CLEAR) ----------
+    async function archiveTodayAndClear() {
+      if (!isAdmin) {
+        alert("Admin only. Ask your lead.");
+        return;
+      }
+      if (rows.length === 0) {
+        alert("No rows to archive.");
+        return;
+      }
+      if (!confirm("Archive today's metrics and clear ALL rows for everyone?")) {
+        return;
+      }
+
+      const t = todayStr();
+      const metricsByUser = {};
+      const allKey = "_all";
+
+      function ensureUser(key) {
+        if (!metricsByUser[key]) {
+          metricsByUser[key] = {
+            total: 0,
+            done: 0,
+            notDone: 0,
+            boxesTotal: 0,
+            boxesDone: 0
+          };
+        }
+      }
+
+      for (const row of rows) {
+        const d = row.dateStr || t;
+        if (d !== t) continue; // only today's rows
+
+        const u = row.user || "UNKNOWN";
+        const boxesNum =
+          row.boxes === "" || row.boxes == null ? 0 : Number(row.boxes) || 0;
+
+        ensureUser(u);
+        ensureUser(allKey);
+
+        // per-user
+        metricsByUser[u].total++;
+        metricsByUser[u].boxesTotal += boxesNum;
+        if (row.status === "DONE") {
+          metricsByUser[u].done++;
+          metricsByUser[u].boxesDone += boxesNum;
+        } else {
+          metricsByUser[u].notDone++;
+        }
+
+        // all-users aggregate
+        metricsByUser[allKey].total++;
+        metricsByUser[allKey].boxesTotal += boxesNum;
+        if (row.status === "DONE") {
+          metricsByUser[allKey].done++;
+          metricsByUser[allKey].boxesDone += boxesNum;
+        } else {
+          metricsByUser[allKey].notDone++;
+        }
+      }
+
+      try {
+        const metricsRef = ref(db, "metrics/" + t);
+        await set(metricsRef, metricsByUser);
+
+        // Now clear rows
+        rows = [];
+        selectedIndex = null;
+        saveLocal();
+        saveCloud();
+        renderTable();
+        setStatus("Day archived to /metrics/" + t + " and rows cleared.");
+      } catch (err) {
+        console.error("Archive error:", err);
+        alert("Error archiving metrics. Rows NOT cleared.\n" + err.message);
+        setStatus("Archive failed. See console.");
+      }
+    }
+
     // ---------- CSV LOAD (only from file) ----------
     function loadCSVFile(file) {
       const reader = new FileReader();
@@ -402,6 +568,7 @@
         const text = e.target.result;
         const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
         const newRows = [];
+        const t = todayStr();
         for (let i = 1; i < lines.length; i++) {
           const line = lines[i];
           const parts = line.split(",");
@@ -417,7 +584,8 @@
             boxes,
             status: status === "DONE" ? "DONE" : "NOT DONE",
             desc: (desc || "").trim(),
-            user: currentUser || ""
+            user: currentUser || "",
+            dateStr: t
           });
         }
         rows = newRows;
@@ -432,6 +600,18 @@
 
     // ---------- BUTTON EVENTS ----------
     function hookButtons() {
+      // Admin login
+      document.getElementById("btn-admin").addEventListener("click", () => {
+        const entered = prompt("Enter admin PIN:");
+        if (entered === ADMIN_PIN) {
+          isAdmin = true;
+          updateAdminUI();
+          setStatus("Admin mode enabled.");
+        } else {
+          alert("Incorrect PIN.");
+        }
+      });
+
       // Set user
       document.getElementById("btn-set-user").addEventListener("click", () => {
         const val = document.getElementById("in-user").value.trim();
@@ -461,7 +641,7 @@
         }
         const data = readForm();
         if (!data) return;
-        const row = { ...data, user: currentUser };
+        const row = { ...data, user: currentUser, dateStr: todayStr() };
         rows.push(row);
         selectedIndex = rows.length - 1;
         saveLocal();
@@ -478,8 +658,10 @@
         }
         const data = readForm();
         if (!data) return;
-        const oldUser = rows[selectedIndex].user || currentUser || "";
-        rows[selectedIndex] = { ...data, user: oldUser };
+        const oldRow = rows[selectedIndex];
+        const oldUser = oldRow.user || currentUser || "";
+        const oldDateStr = oldRow.dateStr || todayStr();
+        rows[selectedIndex] = { ...data, user: oldUser, dateStr: oldDateStr };
         saveLocal();
         saveCloud();
         renderTable();
@@ -495,14 +677,9 @@
         setStatus("Inputs cleared.");
       });
 
-      document.getElementById("btn-clear-all").addEventListener("click", () => {
-        if (!confirm("Clear the entire database for everyone?")) return;
-        rows = [];
-        selectedIndex = null;
-        saveLocal();
-        saveCloud();
-        renderTable();
-        setStatus("Database cleared.");
+      // End Day (Archive + Clear) - ADMIN ONLY
+      document.getElementById("btn-end-day").addEventListener("click", () => {
+        archiveTodayAndClear();
       });
 
       document.getElementById("file-input").addEventListener("change", (e) => {
@@ -548,6 +725,8 @@
       renderTable();
       startCloudListener();
       updateStatusBar();
+      updateMetricsPanel();
+      updateAdminUI();  // hide End Day button until admin logs in
     });
   </script>
 </head>
@@ -558,6 +737,7 @@
     <input id="in-user" placeholder="Your name / initials" />
     <button id="btn-set-user">Set user</button>
     <button id="btn-filter">Filter: Mine</button>
+    <button id="btn-admin">Admin</button>
   </div>
 
   <div class="top-bar">
@@ -576,11 +756,16 @@
     <button id="btn-add">Add row</button>
     <button id="btn-update">Update selected</button>
     <button id="btn-clear-form">Clear inputs</button>
-    <button id="btn-clear-all">Clear database</button>
+    <button id="btn-end-day">End Day (Archive + Clear)</button>
     <button id="btn-order">Order ⬆</button>
   </div>
 
   <div id="status">Status: Ready</div>
+
+  <div id="metrics-panel" class="metrics-panel">
+    <div class="metrics-row">Today (You): …</div>
+    <div class="metrics-row">Today (All): …</div>
+  </div>
 
   <div class="table-wrapper">
     <table id="data-table">
