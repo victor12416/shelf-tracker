@@ -226,7 +226,8 @@
       getDatabase,
       ref,
       onValue,
-      set
+      set,
+      get
     } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-database.js";
 
     // ---------- YOUR FIREBASE CONFIG ----------
@@ -258,6 +259,9 @@
     let currentUser = "";
     let lastStatusNote = "Ready";
   let currentZoom = 1.0;
+  // Metrics mode: "today" (default) shows in-memory today's rows; "week" shows aggregated archived metrics
+  let metricsMode = "today";
+  let weeklyMetrics = { me: null, all: null };
 
     // --- Admin state ---
     const ADMIN_PIN = "4095";  // <<< CHANGE THIS TO YOUR SECRET PIN
@@ -346,29 +350,55 @@
       const panel = document.getElementById("metrics-panel");
       if (!panel) return;
 
-      const meMetrics =
-        currentUser ? computeDailyMetrics(currentUser) : null;
-      const allMetrics = computeDailyMetrics(null);
+      if (metricsMode === "today") {
+        const meMetrics = currentUser ? computeDailyMetrics(currentUser) : null;
+        const allMetrics = computeDailyMetrics(null);
 
-      let meLine;
-      if (!currentUser) {
-        meLine = "Today (You): set your initials to see your metrics.";
-      } else {
-        meLine =
-          `Today (You - ${currentUser}): ` +
-          `${meMetrics.total} rows | ✔ ${meMetrics.done} | ❌ ${meMetrics.notDone}` +
-          ` | Boxes: ${meMetrics.boxesTotal} (✔ ${meMetrics.boxesDone})`;
+        let meLine;
+        if (!currentUser) {
+          meLine = "Today (You): set your initials to see your metrics.";
+        } else {
+          meLine =
+            `Today (You - ${currentUser}): ` +
+            `${meMetrics.total} rows | ✔ ${meMetrics.done} | ❌ ${meMetrics.notDone}` +
+            ` | Boxes: ${meMetrics.boxesTotal} (✔ ${meMetrics.boxesDone})`;
+        }
+
+        const allLine =
+          `Today (All): ${allMetrics.total} rows | ✔ ${allMetrics.done}` +
+          ` | ❌ ${allMetrics.notDone} | Boxes: ${allMetrics.boxesTotal}` +
+          ` (✔ ${allMetrics.boxesDone})`;
+
+        panel.innerHTML = `
+          <div class="metrics-row">${meLine}</div>
+          <div class="metrics-row">${allLine}</div>
+        `;
+      } else if (metricsMode === "week") {
+        // weeklyMetrics may be null if load failed
+        const me = weeklyMetrics.me;
+        const all = weeklyMetrics.all;
+
+        let meLine;
+        if (!currentUser) {
+          meLine = "This Week (You): set your initials to see your metrics.";
+        } else if (!me) {
+          meLine = "This Week (You): no archived data available.";
+        } else {
+          meLine =
+            `This Week (You - ${currentUser}): ` +
+            `${me.total} rows | ✔ ${me.done} | ❌ ${me.notDone}` +
+            ` | Boxes: ${me.boxesTotal} (✔ ${me.boxesDone})`;
+        }
+
+        const allLine = !all
+          ? "This Week (All): no archived data available."
+          : `This Week (All): ${all.total} rows | ✔ ${all.done} | ❌ ${all.notDone} | Boxes: ${all.boxesTotal} (✔ ${all.boxesDone})`;
+
+        panel.innerHTML = `
+          <div class="metrics-row">${meLine}</div>
+          <div class="metrics-row">${allLine}</div>
+        `;
       }
-
-      const allLine =
-        `Today (All): ${allMetrics.total} rows | ✔ ${allMetrics.done}` +
-        ` | ❌ ${allMetrics.notDone} | Boxes: ${allMetrics.boxesTotal}` +
-        ` (✔ ${allMetrics.boxesDone})`;
-
-      panel.innerHTML = `
-        <div class="metrics-row">${meLine}</div>
-        <div class="metrics-row">${allLine}</div>
-      `;
     }
 
     // ---------- LOCAL STORAGE ----------
@@ -437,6 +467,54 @@
         }
       } catch (e) {
         console.warn("localStorage zoom load error:", e);
+      }
+    }
+
+    // ---------- WEEKLY METRICS (archive) ----------
+    async function loadWeeklyMetrics() {
+      // Initialize accumulators
+      weeklyMetrics.me = { total: 0, done: 0, notDone: 0, boxesTotal: 0, boxesDone: 0 };
+      weeklyMetrics.all = { total: 0, done: 0, notDone: 0, boxesTotal: 0, boxesDone: 0 };
+
+      try {
+        const snap = await get(ref(db, "metrics"));
+        const allDays = snap && snap.exists() ? snap.val() : null;
+
+        // iterate today backwards up to 6 days (0..6)
+        const now = new Date();
+        for (let d = 0; d <= 6; d++) {
+          const day = new Date(now);
+          day.setDate(now.getDate() - d);
+          const key = day.toISOString().slice(0, 10); // YYYY-MM-DD
+          if (!allDays || !allDays[key]) continue; // no archived data for this date
+
+          const dayMetrics = allDays[key];
+
+          // All-users bucket
+          if (dayMetrics["_all"]) {
+            const a = dayMetrics["_all"];
+            weeklyMetrics.all.total += Number(a.total || 0);
+            weeklyMetrics.all.done += Number(a.done || 0);
+            weeklyMetrics.all.notDone += Number(a.notDone || 0);
+            weeklyMetrics.all.boxesTotal += Number(a.boxesTotal || 0);
+            weeklyMetrics.all.boxesDone += Number(a.boxesDone || 0);
+          }
+
+          // Per-user bucket (only if currentUser present and that bucket exists)
+          if (currentUser && dayMetrics[currentUser]) {
+            const m = dayMetrics[currentUser];
+            weeklyMetrics.me.total += Number(m.total || 0);
+            weeklyMetrics.me.done += Number(m.done || 0);
+            weeklyMetrics.me.notDone += Number(m.notDone || 0);
+            weeklyMetrics.me.boxesTotal += Number(m.boxesTotal || 0);
+            weeklyMetrics.me.boxesDone += Number(m.boxesDone || 0);
+          }
+        }
+      } catch (err) {
+        console.error("Error loading weekly metrics:", err);
+        // On error, set weeklyMetrics to null to indicate unavailable
+        weeklyMetrics.me = null;
+        weeklyMetrics.all = null;
       }
     }
 
@@ -825,6 +903,28 @@
           setStatus("Zoom: " + Math.round(currentZoom * 100) + "%");
         });
       }
+
+      // Metrics mode toggle: today <-> week
+      const btnMetricsMode = document.getElementById("btn-metrics-mode");
+      if (btnMetricsMode) {
+        btnMetricsMode.addEventListener("click", async () => {
+          if (metricsMode === "today") {
+            // switch to week
+            metricsMode = "week";
+            btnMetricsMode.textContent = "View: Today";
+            setStatus("Loading weekly metrics...");
+            await loadWeeklyMetrics();
+            updateMetricsPanel();
+            setStatus("Weekly metrics loaded.");
+          } else {
+            // switch to today
+            metricsMode = "today";
+            btnMetricsMode.textContent = "View: Week";
+            updateMetricsPanel();
+            setStatus("Showing today's metrics.");
+          }
+        });
+      }
     }
 
     function updateFilterButtonText() {
@@ -890,6 +990,7 @@
     <button id="btn-clear-form">Clear inputs</button>
     <button id="btn-end-day">End Day (Archive + Clear)</button>
     <button id="btn-order">Order ⬆</button>
+    <button id="btn-metrics-mode">View: Week</button>
     <button id="btn-zoom-in">Zoom +</button>
     <button id="btn-zoom-out">Zoom −</button>
   </div>
