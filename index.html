@@ -101,6 +101,16 @@
       background: #061427;
       color: #ffffff;
     }
+    .top-bar button {
+      flex: 0 0 auto;
+      padding: 8px;
+      font-size: 16px;
+      border-radius: 4px;
+      border: none;
+      background: #0063AD;
+      color: #ffffff;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.5);
+    }
 
     .buttons-row {
       display: flex;
@@ -879,6 +889,19 @@
         );
       });
 
+      // Toggle the input status quickly from the top input area
+      const btnToggleStatus = document.getElementById("btn-toggle-status");
+      if (btnToggleStatus) {
+        btnToggleStatus.addEventListener("click", () => {
+          const sel = document.getElementById("in-status");
+          if (!sel) return;
+          const cur = (sel.value || "").toUpperCase();
+          const next = cur === "DONE" ? "NOT DONE" : "DONE";
+          sel.value = next;
+          setStatus("Input status set to: " + next);
+        });
+      }
+
       // Zoom controls (per-device)
       const btnZoomIn = document.getElementById("btn-zoom-in");
       if (btnZoomIn) {
@@ -977,6 +1000,7 @@
       <option value="NOT DONE">NOT DONE</option>
       <option value="DONE">DONE</option>
     </select>
+    <button id="btn-toggle-status">Toggle Status</button>
     <input id="in-desc" placeholder="Description (pallet empty, no pallet, etc.)" />
   </div>
 
