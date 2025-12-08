@@ -92,7 +92,8 @@
       margin-bottom: 8px;
     }
     .top-bar input,
-    .top-bar select {
+    .top-bar select,
+    #in-status {
       flex: 1 1 30%;
       padding: 8px;
       font-size: 18px;
@@ -100,17 +101,15 @@
       border: 1px solid #3b5f87;
       background: #061427;
       color: #ffffff;
+      text-align: left;
     }
-    .top-bar button {
-      flex: 0 0 auto;
-      padding: 8px;
-      font-size: 16px;
-      border-radius: 4px;
-      border: none;
-      background: #0063AD;
-      color: #ffffff;
-      box-shadow: 0 1px 2px rgba(0,0,0,0.5);
+    #in-status {
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      cursor: pointer;
     }
+    /* small toggle button removed (status box is tappable) */
 
     .buttons-row {
       display: flex;
@@ -562,7 +561,11 @@
       document.getElementById("in-sku").value = "";
       document.getElementById("in-from").value = "";
       document.getElementById("in-boxes").value = "";
-      document.getElementById("in-status").value = "NOT DONE";
+      const inStatusEl = document.getElementById("in-status");
+      if (inStatusEl) {
+        inStatusEl.dataset.status = "NOT DONE";
+        inStatusEl.textContent = "NOT DONE";
+      }
       document.getElementById("in-desc").value = "";
     }
 
@@ -571,7 +574,18 @@
       let sku = document.getElementById("in-sku").value.trim().toUpperCase();
       let fromLoc = document.getElementById("in-from").value.trim().toUpperCase();
       let boxesVal = document.getElementById("in-boxes").value.trim();
-      let status = document.getElementById("in-status").value.trim().toUpperCase();
+      // support either the old select (value) or the new button (data-status)
+      const inStatusEl2 = document.getElementById("in-status");
+      let status = "NOT DONE";
+      if (inStatusEl2) {
+        if (inStatusEl2.dataset && inStatusEl2.dataset.status !== undefined) {
+          status = (inStatusEl2.dataset.status || "").trim().toUpperCase();
+        } else if (inStatusEl2.value !== undefined) {
+          status = (inStatusEl2.value || "").trim().toUpperCase();
+        } else {
+          status = (inStatusEl2.textContent || "").trim().toUpperCase();
+        }
+      }
       let desc = document.getElementById("in-desc").value.trim();
 
       let boxes = boxesVal === "" ? "" : Number(boxesVal);
@@ -659,7 +673,11 @@
       document.getElementById("in-from").value = row.fromLoc;
       document.getElementById("in-boxes").value =
         row.boxes === "" ? "" : String(row.boxes);
-      document.getElementById("in-status").value = row.status;
+      const inStatusEl3 = document.getElementById("in-status");
+      if (inStatusEl3) {
+        if (inStatusEl3.dataset !== undefined) inStatusEl3.dataset.status = row.status;
+        inStatusEl3.textContent = row.status;
+      }
       document.getElementById("in-desc").value = row.desc;
       renderTable();
       setStatus("Editing row " + (idx + 1) + " (Update to save).");
@@ -889,15 +907,17 @@
         );
       });
 
-      // Toggle the input status quickly from the top input area
-      const btnToggleStatus = document.getElementById("btn-toggle-status");
-      if (btnToggleStatus) {
-        btnToggleStatus.addEventListener("click", () => {
-          const sel = document.getElementById("in-status");
-          if (!sel) return;
-          const cur = (sel.value || "").toUpperCase();
+      // (small toggle button removed; status box itself is tappable)
+
+      // Allow tapping the status box itself to toggle (matches column behaviour)
+      const inStatusBox = document.getElementById("in-status");
+      if (inStatusBox) {
+        inStatusBox.addEventListener("click", (e) => {
+          e.stopPropagation();
+          const cur = ((inStatusBox.dataset && inStatusBox.dataset.status) ? inStatusBox.dataset.status : (inStatusBox.textContent || "")).toUpperCase();
           const next = cur === "DONE" ? "NOT DONE" : "DONE";
-          sel.value = next;
+          if (inStatusBox.dataset !== undefined) inStatusBox.dataset.status = next;
+          inStatusBox.textContent = next;
           setStatus("Input status set to: " + next);
         });
       }
@@ -996,11 +1016,7 @@
     <input id="in-sku" placeholder="SKU (e.g. 2356F)" />
     <input id="in-from" placeholder="From (e.g. FL027)" />
     <input id="in-boxes" type="number" min="0" placeholder="Boxes" />
-    <select id="in-status">
-      <option value="NOT DONE">NOT DONE</option>
-      <option value="DONE">DONE</option>
-    </select>
-    <button id="btn-toggle-status">Toggle Status</button>
+  <button id="in-status" type="button" data-status="NOT DONE">NOT DONE</button>
     <input id="in-desc" placeholder="Description (pallet empty, no pallet, etc.)" />
   </div>
 
