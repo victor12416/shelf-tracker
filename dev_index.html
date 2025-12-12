@@ -1,0 +1,1061 @@
+git checkout -b feature/dev-changes
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Shelf Replenish Tracker</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: radial-gradient(circle at top, #002551 0%, #000000 55%, #000000 100%);
+      color: #ffffff;
+      margin: 0;
+      padding: 10px;
+      font-size: 18px;
+    }
+
+    /* CTDI header bar */
+    .ctdi-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 10px;
+      margin: 4px 0 10px 0;
+      background: linear-gradient(90deg, #002551, #0063AD);
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.4);
+    }
+    .ctdi-logo-circle {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      border: 2px solid #E3EAF8;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      font-size: 18px;
+      color: #E3EAF8;
+      background: rgba(0,0,0,0.25);
+    }
+    .ctdi-title {
+      display: flex;
+      flex-direction: column;
+      line-height: 1.1;
+    }
+    .ctdi-company {
+      font-size: 14px;
+      color: #E3EAF8;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+    }
+    .ctdi-app-name {
+      font-size: 22px;
+      font-weight: bold;
+      color: #ffffff;
+    }
+
+    .user-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin: 4px 0 8px 0;
+    }
+    .user-bar input {
+      flex: 1 1 40%;
+      padding: 8px;
+      font-size: 18px;
+      border-radius: 4px;
+      border: 1px solid #3b5f87;
+      background: #061427;
+      color: #ffffff;
+    }
+    .user-bar button {
+      flex: 1 1 18%;
+      padding: 8px;
+      font-size: 16px;
+      border-radius: 4px;
+      border: none;
+      background: #0063AD;
+      color: #ffffff;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.5);
+    }
+    .user-bar button:active {
+      background: #004c84;
+    }
+
+    .top-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 8px;
+    }
+    .top-bar input,
+    .top-bar select,
+    #in-status {
+      flex: 1 1 30%;
+      padding: 8px;
+      font-size: 18px;
+      border-radius: 4px;
+      border: 1px solid #3b5f87;
+      background: #061427;
+      color: #ffffff;
+      text-align: left;
+    }
+    #in-status {
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      cursor: pointer;
+    }
+    /* small toggle button removed (status box is tappable) */
+
+    .buttons-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 8px;
+    }
+    .buttons-row button {
+      flex: 1 1 45%;
+      padding: 10px;
+      font-size: 18px;
+      border-radius: 4px;
+      border: none;
+      background: #0063AD;
+      color: #ffffff;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.5);
+    }
+    .buttons-row button:active {
+      background: #004c84;
+    }
+
+    #status {
+      font-size: 16px;
+      margin-bottom: 4px;
+      text-align: center;
+      color: #E3EAF8;
+    }
+
+    .metrics-panel {
+      font-size: 14px;
+      margin-bottom: 6px;
+      background: rgba(5, 20, 40, 0.95);
+      border-radius: 6px;
+      padding: 6px 8px;
+      line-height: 1.4;
+      border: 1px solid #3b5f87;
+    }
+    .metrics-row {
+      margin: 2px 0;
+      color: #E3EAF8;
+    }
+
+    .table-wrapper {
+      overflow-x: auto;
+      background: #050b16;
+      border-radius: 6px;
+      padding: 4px;
+      max-height: 65vh;
+      overflow-y: auto;
+      border: 1px solid #3b5f87;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 900px;
+    }
+    th,
+    td {
+      border: 1px solid #1b3150;
+      padding: 6px;
+      text-align: center;
+      font-size: 20px; /* BIG row text */
+    }
+    th {
+      background: #002551;
+      color: #E3EAF8;
+      font-size: 20px;
+    }
+    tr:nth-child(even) td {
+      background: #081427;
+    }
+    tr:nth-child(odd) td {
+      background: #050e20;
+    }
+    tr.selected td {
+      outline: 3px solid #ffff00;
+      outline-offset: -3px;
+    }
+
+    .done-cell.done {
+      background: #114c24 !important;
+    }
+    .done-cell.not-done {
+      background: #5b1b1b !important;
+    }
+    .done-cell {
+      cursor: pointer;
+    }
+
+    .row-buttons button {
+      font-size: 16px;
+      padding: 4px 6px;
+      margin: 0 2px;
+      border-radius: 4px;
+      border: none;
+      color: #ffffff;
+      background: #9b2b2b;
+    }
+    .row-buttons .delete-btn {
+      background: #c03535;
+    }
+
+    input:focus, select:focus {
+      outline: 3px solid #ffff00 !important;
+      outline-offset: 2px;
+    }
+
+    /* CSV file-row removed */
+  </style>
+
+  <!-- Firebase modular SDK (v12) as ES modules -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
+    import {
+      getDatabase,
+      ref,
+      onValue,
+      set,
+      get
+    } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-database.js";
+
+    // ---------- YOUR FIREBASE CONFIG ----------
+    const firebaseConfig = {
+      apiKey: "AIzaSyBSjLtFDNob4ccwa_AWP62luhbXNyQN-kc",
+      authDomain: "shelf-tracker-8c090.firebaseapp.com",
+      databaseURL: "https://shelf-tracker-8c090-default-rtdb.firebaseio.com",
+      projectId: "shelf-tracker-8c090",
+      storageBucket: "shelf-tracker-8c090.firebasestorage.app",
+      messagingSenderId: "497676127106",
+      appId: "1:497676127106:web:b2846fbe26c42c69335d9b",
+      measurementId: "G-NEDP05RC65"
+    };
+
+    // ---------- INITIALIZE FIREBASE ----------
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+    const rowsRef = ref(db, "rows");
+
+    // ---------- APP STATE ----------
+    const STORAGE_KEY = "shelf_replenish_backup_v1";
+    const USER_KEY = "shelf_replenish_user_v1";
+  const ZOOM_KEY = "shelf_replenish_zoom_v1";
+
+    let rows = [];
+    let selectedIndex = null;
+    let showNewestFirst = true;   // true = newest at top
+    let filterMineOnly = true;    // true = only my rows, false = all
+    let currentUser = "";
+    let lastStatusNote = "Ready";
+  let currentZoom = 1.0;
+  // Metrics mode: "today" (default) shows in-memory today's rows; "week" shows aggregated archived metrics
+  let metricsMode = "today";
+  let weeklyMetrics = { me: null, all: null };
+
+    // --- Admin state ---
+    const ADMIN_PIN = "4095";  // <<< CHANGE THIS TO YOUR SECRET PIN
+    let isAdmin = false;
+
+    // ---------- DATE HELPERS ----------
+    function todayStr() {
+      return new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+    }
+
+    // ---------- ADMIN UI ----------
+    function updateAdminUI() {
+      const endBtn = document.getElementById("btn-end-day");
+      if (!endBtn) return;
+      endBtn.style.display = isAdmin ? "inline-block" : "none";
+    }
+
+    // ---------- STATUS / METRICS ----------
+    function getDisplayIndices() {
+      const idxs = [];
+      for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        if (filterMineOnly && currentUser) {
+          if (!row.user || row.user !== currentUser) continue;
+        }
+        idxs.push(i);
+      }
+      if (showNewestFirst) idxs.reverse();
+      return idxs;
+    }
+
+    function updateStatusBar() {
+      const el = document.getElementById("status");
+      if (!el) return;
+
+      const indices = getDisplayIndices();
+      let total = indices.length;
+      let done = 0;
+      let notDone = 0;
+
+      for (const idx of indices) {
+        const row = rows[idx];
+        if (row.status === "DONE") done++;
+        else notDone++;
+      }
+
+      el.textContent =
+        `Status: ${total} rows | ✔ ${done} | ❌ ${notDone} — ${lastStatusNote}`;
+    }
+
+    function setStatus(msg) {
+      lastStatusNote = msg;
+      updateStatusBar();
+      updateMetricsPanel();
+    }
+
+    function computeDailyMetrics(forUser) {
+      const t = todayStr();
+      let total = 0;
+      let done = 0;
+      let notDone = 0;
+      let boxesTotal = 0;
+      let boxesDone = 0;
+
+      for (const row of rows) {
+        const d = row.dateStr || t;
+        if (d !== t) continue;
+        if (forUser && row.user !== forUser) continue;
+
+        total++;
+        const boxesNum =
+          row.boxes === "" || row.boxes == null ? 0 : Number(row.boxes) || 0;
+        boxesTotal += boxesNum;
+
+        if (row.status === "DONE") {
+          done++;
+          boxesDone += boxesNum;
+        } else {
+          notDone++;
+        }
+      }
+      return { total, done, notDone, boxesTotal, boxesDone };
+    }
+
+    function updateMetricsPanel() {
+      const panel = document.getElementById("metrics-panel");
+      if (!panel) return;
+
+      if (metricsMode === "today") {
+        const meMetrics = currentUser ? computeDailyMetrics(currentUser) : null;
+        const allMetrics = computeDailyMetrics(null);
+
+        let meLine;
+        if (!currentUser) {
+          meLine = "Today (You): set your initials to see your metrics.";
+        } else {
+          meLine =
+            `Today (You - ${currentUser}): ` +
+            `${meMetrics.total} rows | ✔ ${meMetrics.done} | ❌ ${meMetrics.notDone}` +
+            ` | Boxes: ${meMetrics.boxesTotal} (✔ ${meMetrics.boxesDone})`;
+        }
+
+        const allLine =
+          `Today (All): ${allMetrics.total} rows | ✔ ${allMetrics.done}` +
+          ` | ❌ ${allMetrics.notDone} | Boxes: ${allMetrics.boxesTotal}` +
+          ` (✔ ${allMetrics.boxesDone})`;
+
+        panel.innerHTML = `
+          <div class="metrics-row">${meLine}</div>
+          <div class="metrics-row">${allLine}</div>
+        `;
+      } else if (metricsMode === "week") {
+        // weeklyMetrics may be null if load failed
+        const me = weeklyMetrics.me;
+        const all = weeklyMetrics.all;
+
+        let meLine;
+        if (!currentUser) {
+          meLine = "This Week (You): set your initials to see your metrics.";
+        } else if (!me) {
+          meLine = "This Week (You): no archived data available.";
+        } else {
+          meLine =
+            `This Week (You - ${currentUser}): ` +
+            `${me.total} rows | ✔ ${me.done} | ❌ ${me.notDone}` +
+            ` | Boxes: ${me.boxesTotal} (✔ ${me.boxesDone})`;
+        }
+
+        const allLine = !all
+          ? "This Week (All): no archived data available."
+          : `This Week (All): ${all.total} rows | ✔ ${all.done} | ❌ ${all.notDone} | Boxes: ${all.boxesTotal} (✔ ${all.boxesDone})`;
+
+        panel.innerHTML = `
+          <div class="metrics-row">${meLine}</div>
+          <div class="metrics-row">${allLine}</div>
+        `;
+      }
+    }
+
+    // ---------- LOCAL STORAGE ----------
+    function saveLocal() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(rows));
+      } catch (e) {
+        console.warn("localStorage error:", e);
+      }
+    }
+
+    function loadLocal() {
+      try {
+        const t = localStorage.getItem(STORAGE_KEY);
+        if (t) rows = JSON.parse(t);
+      } catch (e) {
+        console.warn("localStorage error:", e);
+      }
+    }
+
+    function saveUserLocal() {
+      try {
+        localStorage.setItem(USER_KEY, currentUser);
+      } catch (e) {
+        console.warn("localStorage user error:", e);
+      }
+    }
+
+    function loadUserLocal() {
+      try {
+        const u = localStorage.getItem(USER_KEY);
+        if (u) {
+          currentUser = u;
+          const inUser = document.getElementById("in-user");
+          if (inUser) inUser.value = u;
+        }
+      } catch (e) {
+        console.warn("localStorage user error:", e);
+      }
+    }
+
+    // ---------- ZOOM (per-device) ----------
+    function applyZoom() {
+      try {
+        document.body.style.zoom = String(currentZoom);
+      } catch (e) {
+        console.warn("applyZoom error:", e);
+      }
+    }
+
+    function saveZoomLocal() {
+      try {
+        localStorage.setItem(ZOOM_KEY, String(currentZoom));
+      } catch (e) {
+        console.warn("localStorage zoom save error:", e);
+      }
+    }
+
+    function loadZoomLocal() {
+      try {
+        const v = localStorage.getItem(ZOOM_KEY);
+        if (!v) return;
+        const f = parseFloat(v);
+        if (!Number.isNaN(f) && f >= 0.8 && f <= 1.4) {
+          currentZoom = f;
+        }
+      } catch (e) {
+        console.warn("localStorage zoom load error:", e);
+      }
+    }
+
+    // ---------- WEEKLY METRICS (archive) ----------
+    async function loadWeeklyMetrics() {
+      // Initialize accumulators
+      weeklyMetrics.me = { total: 0, done: 0, notDone: 0, boxesTotal: 0, boxesDone: 0 };
+      weeklyMetrics.all = { total: 0, done: 0, notDone: 0, boxesTotal: 0, boxesDone: 0 };
+
+      try {
+        const snap = await get(ref(db, "metrics"));
+        const allDays = snap && snap.exists() ? snap.val() : null;
+
+        // iterate today backwards up to 6 days (0..6)
+        const now = new Date();
+        for (let d = 0; d <= 6; d++) {
+          const day = new Date(now);
+          day.setDate(now.getDate() - d);
+          const key = day.toISOString().slice(0, 10); // YYYY-MM-DD
+          if (!allDays || !allDays[key]) continue; // no archived data for this date
+
+          const dayMetrics = allDays[key];
+
+          // All-users bucket
+          if (dayMetrics["_all"]) {
+            const a = dayMetrics["_all"];
+            weeklyMetrics.all.total += Number(a.total || 0);
+            weeklyMetrics.all.done += Number(a.done || 0);
+            weeklyMetrics.all.notDone += Number(a.notDone || 0);
+            weeklyMetrics.all.boxesTotal += Number(a.boxesTotal || 0);
+            weeklyMetrics.all.boxesDone += Number(a.boxesDone || 0);
+          }
+
+          // Per-user bucket (only if currentUser present and that bucket exists)
+          if (currentUser && dayMetrics[currentUser]) {
+            const m = dayMetrics[currentUser];
+            weeklyMetrics.me.total += Number(m.total || 0);
+            weeklyMetrics.me.done += Number(m.done || 0);
+            weeklyMetrics.me.notDone += Number(m.notDone || 0);
+            weeklyMetrics.me.boxesTotal += Number(m.boxesTotal || 0);
+            weeklyMetrics.me.boxesDone += Number(m.boxesDone || 0);
+          }
+        }
+      } catch (err) {
+        console.error("Error loading weekly metrics:", err);
+        // On error, set weeklyMetrics to null to indicate unavailable
+        weeklyMetrics.me = null;
+        weeklyMetrics.all = null;
+      }
+    }
+
+    // ---------- CLOUD SAVE & LISTEN ----------
+    function saveCloud() {
+      set(rowsRef, rows)
+        .then(() => setStatus("Saved to cloud (" + rows.length + " rows)."))
+        .catch((err) => {
+          console.error(err);
+          setStatus("Cloud save error: " + err.message);
+        });
+    }
+
+    function startCloudListener() {
+      onValue(
+        rowsRef,
+        (snap) => {
+          const val = snap.val();
+          if (Array.isArray(val)) {
+            rows = val.filter((r) => r);
+          } else if (val && typeof val === "object") {
+            rows = Object.values(val);
+          } else {
+            rows = [];
+          }
+          selectedIndex = null;
+          renderTable();
+          saveLocal();
+          setStatus("Loaded from cloud (" + rows.length + " rows).");
+        },
+        (err) => {
+          console.error("Cloud load error:", err);
+          loadLocal();
+          renderTable();
+          setStatus("Cloud load error, using local backup.");
+        }
+      );
+    }
+
+    // ---------- FORM HELPERS ----------
+    function clearForm() {
+      document.getElementById("in-shelf").value = "";
+      document.getElementById("in-sku").value = "";
+      document.getElementById("in-from").value = "";
+      document.getElementById("in-boxes").value = "";
+      const inStatusEl = document.getElementById("in-status");
+      if (inStatusEl) {
+        inStatusEl.dataset.status = "NOT DONE";
+        inStatusEl.textContent = "NOT DONE";
+      }
+      document.getElementById("in-desc").value = "";
+    }
+
+    function readForm() {
+      let shelf = document.getElementById("in-shelf").value.trim().toUpperCase();
+      let sku = document.getElementById("in-sku").value.trim().toUpperCase();
+      let fromLoc = document.getElementById("in-from").value.trim().toUpperCase();
+      let boxesVal = document.getElementById("in-boxes").value.trim();
+      // support either the old select (value) or the new button (data-status)
+      const inStatusEl2 = document.getElementById("in-status");
+      let status = "NOT DONE";
+      if (inStatusEl2) {
+        if (inStatusEl2.dataset && inStatusEl2.dataset.status !== undefined) {
+          status = (inStatusEl2.dataset.status || "").trim().toUpperCase();
+        } else if (inStatusEl2.value !== undefined) {
+          status = (inStatusEl2.value || "").trim().toUpperCase();
+        } else {
+          status = (inStatusEl2.textContent || "").trim().toUpperCase();
+        }
+      }
+      let desc = document.getElementById("in-desc").value.trim();
+
+      let boxes = boxesVal === "" ? "" : Number(boxesVal);
+      if (boxesVal !== "" && Number.isNaN(boxes)) {
+        alert("Boxes must be a number.");
+        return null;
+      }
+      if (status !== "DONE" && status !== "NOT DONE") status = "NOT DONE";
+
+      return { shelf, sku, fromLoc, boxes, status, desc };
+    }
+
+    // ---------- TABLE RENDER ----------
+    function renderTable() {
+      const tbody = document.querySelector("#data-table tbody");
+      tbody.innerHTML = "";
+
+      const indices = getDisplayIndices();
+      for (const realIdx of indices) {
+        const row = rows[realIdx];
+        const tr = document.createElement("tr");
+        if (realIdx === selectedIndex) tr.classList.add("selected");
+
+        function cell(text) {
+          const td = document.createElement("td");
+          td.textContent = text;
+          return td;
+        }
+
+        tr.appendChild(cell(row.user || ""));  // USER column
+        tr.appendChild(cell(row.shelf));
+        tr.appendChild(cell(row.sku));
+        tr.appendChild(cell(row.fromLoc));
+        tr.appendChild(cell(row.boxes));
+
+        const tdDone = cell(row.status);
+        tdDone.classList.add(
+          "done-cell",
+          row.status === "DONE" ? "done" : "not-done"
+        );
+        // make the Done cell tappable to toggle status quickly
+        tdDone.addEventListener("click", (e) => {
+          e.stopPropagation();
+          const current = rows[realIdx].status === "DONE" ? "DONE" : "NOT DONE";
+          const next = current === "DONE" ? "NOT DONE" : "DONE";
+          rows[realIdx].status = next;
+          saveLocal();
+          saveCloud();
+          renderTable();
+          setStatus(next === "DONE" ? "Row marked DONE." : "Row marked NOT DONE.");
+        });
+        tr.appendChild(tdDone);
+
+        tr.appendChild(cell(row.desc));
+
+        const tdActions = document.createElement("td");
+        tdActions.classList.add("row-buttons");
+
+        const btnDel = document.createElement("button");
+        btnDel.textContent = "Del";
+        btnDel.classList.add("delete-btn");
+        btnDel.addEventListener("click", (e) => {
+          e.stopPropagation(); // don't also select the row
+          deleteRow(realIdx);
+        });
+        tdActions.appendChild(btnDel);
+
+        tr.appendChild(tdActions);
+
+        // tap row to select/edit
+        tr.addEventListener("click", () => selectRow(realIdx));
+
+        tbody.appendChild(tr);
+      }
+
+      updateStatusBar();
+      updateMetricsPanel();
+    }
+
+    function selectRow(idx) {
+      selectedIndex = idx;
+      const row = rows[idx];
+      document.getElementById("in-shelf").value = row.shelf;
+      document.getElementById("in-sku").value = row.sku;
+      document.getElementById("in-from").value = row.fromLoc;
+      document.getElementById("in-boxes").value =
+        row.boxes === "" ? "" : String(row.boxes);
+      const inStatusEl3 = document.getElementById("in-status");
+      if (inStatusEl3) {
+        if (inStatusEl3.dataset !== undefined) inStatusEl3.dataset.status = row.status;
+        inStatusEl3.textContent = row.status;
+      }
+      document.getElementById("in-desc").value = row.desc;
+      renderTable();
+      setStatus("Editing row " + (idx + 1) + " (Update to save).");
+    }
+
+    function deleteRow(idx) {
+      if (!confirm("Delete this row?")) return;
+      rows.splice(idx, 1);
+      selectedIndex = null;
+      saveLocal();
+      saveCloud();
+      renderTable();
+      setStatus("Row deleted.");
+    }
+
+    // ---------- END DAY (ARCHIVE + CLEAR) ----------
+    async function archiveTodayAndClear() {
+      if (!isAdmin) {
+        alert("Admin only. Ask your lead.");
+        return;
+      }
+      if (rows.length === 0) {
+        alert("No rows to archive.");
+        return;
+      }
+      if (!confirm("Archive today's metrics and clear ALL rows for everyone?")) {
+        return;
+      }
+
+      const t = todayStr();
+      const metricsByUser = {};
+      const allKey = "_all";
+
+      function ensureUser(key) {
+        if (!metricsByUser[key]) {
+          metricsByUser[key] = {
+            total: 0,
+            done: 0,
+            notDone: 0,
+            boxesTotal: 0,
+            boxesDone: 0
+          };
+        }
+      }
+
+      for (const row of rows) {
+        const d = row.dateStr || t;
+        if (d !== t) continue; // only today's rows
+
+        const u = row.user || "UNKNOWN";
+        const boxesNum =
+          row.boxes === "" || row.boxes == null ? 0 : Number(row.boxes) || 0;
+
+        ensureUser(u);
+        ensureUser(allKey);
+
+        // per-user
+        metricsByUser[u].total++;
+        metricsByUser[u].boxesTotal += boxesNum;
+        if (row.status === "DONE") {
+          metricsByUser[u].done++;
+          metricsByUser[u].boxesDone += boxesNum;
+        } else {
+          metricsByUser[u].notDone++;
+        }
+
+        // all-users aggregate
+        metricsByUser[allKey].total++;
+        metricsByUser[allKey].boxesTotal += boxesNum;
+        if (row.status === "DONE") {
+          metricsByUser[allKey].done++;
+          metricsByUser[allKey].boxesDone += boxesNum;
+        } else {
+          metricsByUser[allKey].notDone++;
+        }
+      }
+
+      try {
+        const metricsRef = ref(db, "metrics/" + t);
+        await set(metricsRef, metricsByUser);
+
+        // Now clear rows
+        rows = [];
+        selectedIndex = null;
+        saveLocal();
+        saveCloud();
+        renderTable();
+        setStatus("Day archived to /metrics/" + t + " and rows cleared.");
+      } catch (err) {
+        console.error("Archive error:", err);
+        alert("Error archiving metrics. Rows NOT cleared.\n" + err.message);
+        setStatus("Archive failed. See console.");
+      }
+    }
+
+    // ---------- CSV LOAD (only from file) ----------
+    function loadCSVFile(file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const text = e.target.result;
+        const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
+        const newRows = [];
+        const t = todayStr();
+        for (let i = 1; i < lines.length; i++) {
+          const line = lines[i];
+          const parts = line.split(",");
+          const [shelf, sku, fromLoc, boxesRaw, statusRaw, ...rest] = parts;
+          const desc = rest.join(",") || "";
+          let boxes = boxesRaw ? Number(boxesRaw) : "";
+          if (Number.isNaN(boxes)) boxes = "";
+          const status = (statusRaw || "").trim().toUpperCase();
+          newRows.push({
+            shelf: (shelf || "").trim().toUpperCase(),
+            sku: (sku || "").trim().toUpperCase(),
+            fromLoc: (fromLoc || "").trim().toUpperCase(),
+            boxes,
+            status: status === "DONE" ? "DONE" : "NOT DONE",
+            desc: (desc || "").trim(),
+            user: currentUser || "",
+            dateStr: t
+          });
+        }
+        rows = newRows;
+        selectedIndex = null;
+        saveLocal();
+        saveCloud();
+        renderTable();
+        setStatus("CSV loaded (" + rows.length + " rows).");
+      };
+      reader.readAsText(file);
+    }
+
+    // ---------- BUTTON EVENTS ----------
+    function hookButtons() {
+      // Admin login
+      document.getElementById("btn-admin").addEventListener("click", () => {
+        const entered = prompt("Enter admin PIN:");
+        if (entered === ADMIN_PIN) {
+          isAdmin = true;
+          updateAdminUI();
+          setStatus("Admin mode enabled.");
+        } else {
+          alert("Incorrect PIN.");
+        }
+      });
+
+      // Set user
+      document.getElementById("btn-set-user").addEventListener("click", () => {
+        const val = document.getElementById("in-user").value.trim();
+        if (!val) {
+          alert("Enter your name or initials.");
+          return;
+        }
+        currentUser = val;
+        saveUserLocal();
+        updateFilterButtonText();
+        renderTable();
+        setStatus("User set to: " + currentUser);
+      });
+
+      // Filter Mine / All
+      document.getElementById("btn-filter").addEventListener("click", () => {
+        filterMineOnly = !filterMineOnly;
+        updateFilterButtonText();
+        renderTable();
+        setStatus(filterMineOnly ? "Showing only your rows." : "Showing all rows.");
+      });
+
+      document.getElementById("btn-add").addEventListener("click", () => {
+        if (!currentUser) {
+          alert("Set your name/initials first.");
+          return;
+        }
+        const data = readForm();
+        if (!data) return;
+        const row = { ...data, user: currentUser, dateStr: todayStr() };
+        rows.push(row);
+        selectedIndex = rows.length - 1;
+        saveLocal();
+        saveCloud();
+        renderTable();
+        clearForm();
+        setStatus("Row added (" + rows.length + " total).");
+      });
+
+      document.getElementById("btn-update").addEventListener("click", () => {
+        if (selectedIndex === null) {
+          setStatus("Select a row first (tap it).");
+          return;
+        }
+        const data = readForm();
+        if (!data) return;
+        const oldRow = rows[selectedIndex];
+        const oldUser = oldRow.user || currentUser || "";
+        const oldDateStr = oldRow.dateStr || todayStr();
+        rows[selectedIndex] = { ...data, user: oldUser, dateStr: oldDateStr };
+        saveLocal();
+        saveCloud();
+        renderTable();
+        clearForm();
+        selectedIndex = null;
+        setStatus("Row updated.");
+      });
+
+      document.getElementById("btn-clear-form").addEventListener("click", () => {
+        clearForm();
+        selectedIndex = null;
+        renderTable();
+        setStatus("Inputs cleared.");
+      });
+
+      // End Day (Archive + Clear) - ADMIN ONLY
+      document.getElementById("btn-end-day").addEventListener("click", () => {
+        archiveTodayAndClear();
+      });
+
+      
+      // Order toggle
+      document.getElementById("btn-order").addEventListener("click", () => {
+        showNewestFirst = !showNewestFirst;
+        updateOrderButtonText();
+        renderTable();
+        setStatus(
+          showNewestFirst
+            ? "Showing newest rows first."
+            : "Showing oldest rows first."
+        );
+      });
+
+      // (small toggle button removed; status box itself is tappable)
+
+      // Allow tapping the status box itself to toggle (matches column behaviour)
+      const inStatusBox = document.getElementById("in-status");
+      if (inStatusBox) {
+        inStatusBox.addEventListener("click", (e) => {
+          e.stopPropagation();
+          const cur = ((inStatusBox.dataset && inStatusBox.dataset.status) ? inStatusBox.dataset.status : (inStatusBox.textContent || "")).toUpperCase();
+          const next = cur === "DONE" ? "NOT DONE" : "DONE";
+          if (inStatusBox.dataset !== undefined) inStatusBox.dataset.status = next;
+          inStatusBox.textContent = next;
+          setStatus("Input status set to: " + next);
+        });
+      }
+
+      // Zoom controls (per-device)
+      const btnZoomIn = document.getElementById("btn-zoom-in");
+      if (btnZoomIn) {
+        btnZoomIn.addEventListener("click", () => {
+          currentZoom = Math.min(1.4, Math.round((currentZoom + 0.1) * 10) / 10);
+          applyZoom();
+          saveZoomLocal();
+          setStatus("Zoom: " + Math.round(currentZoom * 100) + "%");
+        });
+      }
+
+      const btnZoomOut = document.getElementById("btn-zoom-out");
+      if (btnZoomOut) {
+        btnZoomOut.addEventListener("click", () => {
+          currentZoom = Math.max(0.8, Math.round((currentZoom - 0.1) * 10) / 10);
+          applyZoom();
+          saveZoomLocal();
+          setStatus("Zoom: " + Math.round(currentZoom * 100) + "%");
+        });
+      }
+
+      // Metrics mode toggle: today <-> week
+      const btnMetricsMode = document.getElementById("btn-metrics-mode");
+      if (btnMetricsMode) {
+        btnMetricsMode.addEventListener("click", async () => {
+          if (metricsMode === "today") {
+            // switch to week
+            metricsMode = "week";
+            btnMetricsMode.textContent = "View: Today";
+            setStatus("Loading weekly metrics...");
+            await loadWeeklyMetrics();
+            updateMetricsPanel();
+            setStatus("Weekly metrics loaded.");
+          } else {
+            // switch to today
+            metricsMode = "today";
+            btnMetricsMode.textContent = "View: Week";
+            updateMetricsPanel();
+            setStatus("Showing today's metrics.");
+          }
+        });
+      }
+    }
+
+    function updateFilterButtonText() {
+      const btn = document.getElementById("btn-filter");
+      if (!btn) return;
+      btn.textContent = filterMineOnly ? "Filter: Mine" : "Filter: All";
+    }
+
+    function updateOrderButtonText() {
+      const btn = document.getElementById("btn-order");
+      if (!btn) return;
+      btn.textContent = showNewestFirst ? "Order ⬆" : "Order ⬇";
+    }
+
+    // ---------- INIT ----------
+    window.addEventListener("DOMContentLoaded", () => {
+      loadUserLocal();
+      loadZoomLocal();
+      applyZoom();
+      hookButtons();
+      updateFilterButtonText();
+      updateOrderButtonText();
+      loadLocal();
+      renderTable();
+      startCloudListener();
+      updateStatusBar();
+      updateMetricsPanel();
+      updateAdminUI();  // hide End Day button until admin logs in
+    });
+  </script>
+</head>
+<body>
+  <div class="ctdi-header">
+    <div class="ctdi-logo-circle">CTDI</div>
+    <div class="ctdi-title">
+      <div class="ctdi-company">CTDI – Warehouse Operations</div>
+      <div class="ctdi-app-name">Shelf Replenish Tracker</div>
+    </div>
+  </div>
+
+  <div class="user-bar">
+    <input id="in-user" placeholder="Your name / initials" />
+    <button id="btn-set-user">Set user</button>
+    <button id="btn-filter">Filter: Mine</button>
+    <button id="btn-admin">Admin</button>
+  </div>
+
+  <div class="top-bar">
+    <input id="in-shelf" placeholder="Shelf (e.g. AA03)" />
+    <input id="in-sku" placeholder="SKU (e.g. 2356F)" />
+    <input id="in-from" placeholder="From (e.g. FL027)" />
+    <input id="in-boxes" type="number" min="0" placeholder="Boxes" />
+  <button id="in-status" type="button" data-status="NOT DONE">NOT DONE</button>
+    <input id="in-desc" placeholder="Description (pallet empty, no pallet, etc.)" />
+  </div>
+
+  <div class="buttons-row">
+    <button id="btn-add">Add row</button>
+    <button id="btn-update">Update selected</button>
+    <button id="btn-clear-form">Clear inputs</button>
+    <button id="btn-end-day">End Day (Archive + Clear)</button>
+    <button id="btn-order">Order ⬆</button>
+    <button id="btn-metrics-mode">View: Week</button>
+    <button id="btn-zoom-in">Zoom +</button>
+    <button id="btn-zoom-out">Zoom −</button>
+  </div>
+
+  <div id="status">Status: Ready</div>
+
+  <div id="metrics-panel" class="metrics-panel">
+    <div class="metrics-row">Today (You): …</div>
+    <div class="metrics-row">Today (All): …</div>
+  </div>
+
+  <div class="table-wrapper">
+    <table id="data-table">
+      <thead>
+        <tr>
+          <th>User</th>
+          <th>Shelf</th>
+          <th>SKU</th>
+          <th>From</th>
+          <th>Boxes</th>
+          <th>Done?</th>
+          <th>Description</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+  
+</body>
+</html>
